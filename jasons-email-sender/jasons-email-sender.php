@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) OR exit;
 /**
 * Plugin Name: Jason's Email Sender
 * Plugin URI: /opt/lampp/htdocs/wp/wp-content/plugins
@@ -14,10 +15,22 @@ if (!class_exists('JasonEmailSender'))
             // Put the add_action hooks here.
             add_action('init', array(&$this, 'createSubscriberPage'));
             add_action('init', array(&$this, 'createSubscribers'));
-            add_action('wp_head', array(&$this, 'addHeaderComment'));
             add_action('publish_post', array(&$this, 'sendNotificationEmail'));
+            add_filter('page_template', array(&$this, 'load_subscriber_template'));
         }
 
+        // $template arg neccessary... not sure why yet.
+        public function load_subscriber_template( $template )
+        {
+            if( is_page('Subscribers') ) {
+                $page_template = dirname(__FILE__) . '/templates/page-subscribers.php';
+                return $page_template;
+            }
+
+            return $template;
+        }
+        
+        // Create the subscriber page.
         public function createSubscriberPage()
         {
             global $wpdb;
@@ -27,12 +40,24 @@ if (!class_exists('JasonEmailSender'))
             if ( !$the_page ) {
                 $subscribers = array();
                 $subscribers['post_title'] = $page_title;
-                $subscribers['post_content'] = "TEST YO";
+                $subscribers['post_content'] = "";
                 $subscribers['post_type'] = 'page';
                 $subscribers['post_status'] = 'publish';
-
+                // Submits the page.
                 $page_id = wp_insert_post( $subscribers );
+
             } 
+        }
+
+        public function email_sender_deactivate()
+        {
+            
+            global $wpdb;
+
+            $page_title = "Subscribers";
+            $the_page = get_page_by_title( $page_title );
+            $the_page = $the_page->ID;
+            wp_delete_post( $the_page );
         }
 
         public function createSubscribers() 
@@ -48,11 +73,9 @@ if (!class_exists('JasonEmailSender'))
             );
         }
 
-        public function addHeaderComment()
+        public function activate()
         {
-            ?>
-            <!-- IM ALIVEEEEE! -->
-            <?
+
         }
 
         public function sendNotificationEmail()                             // Sends emails even if a post is updated currently... fix that shit; that'd be annoying.
@@ -61,7 +84,6 @@ if (!class_exists('JasonEmailSender'))
             $blog_title = get_bloginfo( 'name' );
             $subj = 'Test';
             $body = 'Hello! You are receiving this email because you are subscribed to ' . $blog_title . '.';
-            $body .= ' To unsubscribe you can go fuckoff... I am too powerful now.';
             $body .= ' This was automated with Jason Email Sender. Unfortunately this plugin is unavailable for download at this point.';
             $headers = 'From: ' . $blog_title . ' <myname@example.com>' . "\r\n";
             $loop = new WP_Query( $subscribers );
@@ -76,10 +98,10 @@ if (!class_exists('JasonEmailSender'))
 }
 
 
-if (class_exists('JasonEmailSender'))
+if ( class_exists('JasonEmailSender') )
 {
-    register_activation_hook(__FILE__, array('JasonEmailSender', 'activate'));
-    register_deactivation_hook(__FILE__, array('JasonEmailSender', 'deactivate'));
+    register_activation_hook(__FILE__, array('JasonEmailSender', 'activate') );
+    register_deactivation_hook(__FILE__, array('JasonEmailSender', 'email_sender_deactivate') );
 
     $JasonEmailSender = new JasonEmailSender();
 }
